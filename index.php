@@ -1,18 +1,20 @@
 <?php
 
-require_once __DIR__ . '/Core/Request.php';
-require_once __DIR__ . '/Core/Response.php';
-require_once __DIR__ . '/Core/Route.php';
-require_once __DIR__ . '/Core/AbstractController.php';
-require_once __DIR__ . '/Controllers/HomeController.php';
-require_once __DIR__ . '/Controllers/AdminController.php';
-require_once __DIR__ . '/Controllers/AboutController.php';
+require_once __DIR__ . '/vendor/autoload.php';
 
-$request = new Request(
-    $_SERVER['REQUEST_METHOD'],
-    $_SERVER['REQUEST_URI'],
-    $_SERVER['SERVER_PROTOCOL'],
-);
+use Bebeton\Backend\Controllers\AboutController;
+use Bebeton\Backend\Controllers\AdminController;
+use Bebeton\Backend\Controllers\HomeController;
+use Bebeton\Backend\Core\Database\DatabaseFactory;
+use Bebeton\Backend\Core\Database\Database;
+use Bebeton\Backend\Core\Route;
+use Bebeton\Backend\Core\Response;
+use Bebeton\Backend\Core\RequestFactory;
+use Bebeton\Backend\Core\Models\ClassMethod;
+use Symfony\Component\Yaml\Yaml;
+
+
+$request = RequestFactory::create();
 
 $homeController = new HomeController();
 $aboutController = new AboutController();
@@ -25,12 +27,19 @@ $controllers = [
     AdminController::class,
 ];
 
-class ClassMethod
-{
-    public string $methodName;
+$parser = Yaml::parseFile(__DIR__ . '/config/database.yml');
+$databaseFactory = new DatabaseFactory(
+    $parser['pdo']['host'],
+    $parser['pdo']['port'],
+$parser['pdo']['username'],
+$parser['pdo']['password'],
+  $parser['pdo']['db_name']
+    );
 
-    public string $className;
-}
+
+
+$database = $databaseFactory->create();
+// var_dump($database->query('SELECT * FROM posts'));
 
 /** @var array<string, ClassMethod> $routeClassMethodMap */
 $routeClassMethodMap = [];
@@ -41,30 +50,27 @@ foreach ($controllers as $controller) {
         foreach ($method->getAttributes() as $attribute) {
             if ($attribute->getName() === Route::class) {
                 $classMethod = new ClassMethod();
-                $classMethod->methodName = $method->getName();
-                $classMethod->className = $controller;
+                $classMethod->setMethodName($method->getName());
+                $classMethod->setClassName($controller);
                 $routeClassMethodMap[$attribute->getArguments()[0]] = $classMethod;
             }
         }
-    }
+    }       
 }
 
-$classMethod = $routeClassMethodMap[$request->uri];
-
-if (!isset($classMethod)) {
+if (!isset($routeClassMethodMap[$request->getUri()])) {
     $response = new Response();
     $response->status = 404;
-    $response->body = file_get_contents(__DIR__ . '/views/404.html');
+    $response->body = file_get_contents(__DIR__ . '/views/404.bebeton.html');
 } else {
-    $className = $classMethod->className;
-    $methodName = $classMethod->methodName;
+    $classMethod = $routeClassMethodMap[$request->getUri()];
+    $className = $classMethod->getClassName();
+    $methodName = $classMethod->getMethodName();
 
     $class = new $className();
 
     $response = $class->$methodName();
 
 }
-foreach ($response->headers as $name => $header) {
-    header("$name: $header");
-}
-echo $response->body;
+
+echo $response;

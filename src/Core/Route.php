@@ -1,5 +1,9 @@
 <?php
 
+namespace Bebeton\Backend\Core;
+
+use Attribute;
+
 #[Attribute]
 class Route
 {
