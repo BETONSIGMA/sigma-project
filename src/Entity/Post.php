@@ -11,6 +11,13 @@ class Post
 
     private $author;
 
+    public function __construct(string $title, string $text, string $author)
+    {
+        $this->title = $title;
+        $this->text = $text;
+        $this->author = $author;
+    }
+
     public function getTitle(): string
     {
 
